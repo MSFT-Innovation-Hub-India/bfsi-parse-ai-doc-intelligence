@@ -6,7 +6,6 @@ AI-powered document analysis system using Azure OpenAI GPT-4 Vision for medical 
 
 - **Document Analysis** - Medical reports, X-rays, generic documents, batch processing
 - **Fraud Detection** - Cross-document comparison, fake detection, tampering analysis
-- **Customer Management** - Upload, storage, analysis history
 
 ## Quick Start
 
@@ -38,7 +37,7 @@ cp .env.example .env
 ```env
 AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
 AZURE_OPENAI_API_KEY=your-api-key
-AZURE_OPENAI_DEPLOYMENT=gpt-4.1
+AZURE_OPENAI_DEPLOYMENT=
 ```
 
 **Frontend `.env.local`:**
