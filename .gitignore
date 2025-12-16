@@ -1,0 +1,121 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+*.pyc
+.pytest_cache/
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+pythonenv*/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.vs/
+
+# Uploads and temporary files
+api-server/uploads/
+api-server/temp_extracted_images/
+docufraud/temp_extracted_images/
+uploads/
+temp_extracted_images/
+*.log
+*.tmp
+
+# Node.js / Frontend
+node_modules/
+.next/
+out/
+.DS_Store
+*.pem
+package-lock.json
+
+# Environment variables - NEVER COMMIT THESE!
+.env
+.env.local
+.env.production.local
+.env.development.local
+.env.production
+.env.test
+*.env
+
+# Build outputs
+hospital-frontend/.next/
+hospital-frontend/out/
+hospital-frontend/dist/
+hospital-frontend/build/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Analysis results and reports
+*_analysis_*.json
+*_summary_*.txt
+*_report_*.json
+*_report_*.txt
+fraud_detection_reports/
+co_document_reports/
+integrated_reports/
+tampering_reports/
+out_*/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Sensitive configuration files with credentials
+*config.py.backup
+*credentials*.json
+*secrets*.json
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Test coverage
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+
+# Azure & Cloud
+*.publishsettings
+
+# Backup files
+*.bak
+*.backup
+*~
+land doc

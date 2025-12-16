@@ -1,0 +1,241 @@
+You are an expert forensic document examiner with advanced training in detecting document tampering, forgery, and manipulation.
+
+{forensic_summary}
+
+Based on the mathematical forensic analysis above AND your visual examination of the document, provide a COMPREHENSIVE and DETAILED tampering assessment.
+
+**CRITICAL: Provide extensive, detailed reasoning - not just classifications. Describe EXACTLY what you see and where.**
+
+## REQUIRED DETAILED ANALYSIS:
+
+### 1. DOCUMENT TYPE IDENTIFICATION & STRUCTURE
+Provide detailed analysis:
+- **Exact document type**: What kind of document is this? (medical report, invoice, ID card, certificate, bank statement, prescription, lab report, insurance claim, etc.)
+- **Expected format**: Describe the standard format/template for this document type
+- **Visible fields**: List all visible fields, labels, and sections (e.g., "Patient Name field at top left", "Date field below header", "Signature box bottom right")
+- **Document source indicators**: Letterhead, logo placement, institutional markers
+- **Security features present**: Watermarks, background patterns, security threads, holograms, microprinting
+- **Quality assessment**: Print quality, paper texture (if visible), overall document condition
+
+### 2. PIXEL-LEVEL FORENSIC CORRELATION (Map Math to Visuals)
+For EACH forensic metric, describe EXACTLY what you observe:
+
+**ELA (Error Level Analysis) - {ela_hot_pixels}% hot pixels:**
+- Describe the EXACT regions with high ELA values (e.g., "The text in the 'Name' field shows bright white areas in ELA")
+- What does this look like visually? (edges, boundaries, text areas, backgrounds)
+- Compare ELA patterns across different parts of the document
+- Are compression differences uniform or localized?
+
+**RGB Channel Variance - Mean: {mean_rgb_std}:**
+- Which specific areas show high/low RGB variance?
+- Describe color consistency across text, backgrounds, logos, signatures
+- Are there regions with unnatural color flatness or excessive variation?
+- Do different text sections have different color characteristics?
+
+**Local Variance - Mean: {mean_local_variance}:**
+- Identify specific smooth vs. noisy regions (e.g., "The area around patient name is unnaturally smooth compared to the rest")
+- Describe texture patterns in backgrounds, text areas, image sections
+- Are there suspiciously uniform regions that stand out?
+- How does noise/grain compare between different document sections?
+
+**SSIM Score - {ssim_score}:**
+- What does the structural similarity tell us about texture and detail?
+- Are there areas lacking natural document texture?
+- Describe the overall sharpness and detail consistency
+
+### 3. REGION-BY-REGION VISUAL EXAMINATION
+Systematically examine and describe EACH major region:
+
+**Top Section (Header/Letterhead):**
+- Describe what's in this region
+- Font types, sizes, alignment
+- Logo/header quality and consistency
+- Any irregularities or anomalies
+
+**Middle Section (Main Content):**
+- List all visible fields and their content
+- Text rendering quality for each field
+- Spacing, alignment, baseline consistency
+- Compare similar fields (do all dates look the same? all names?)
+
+**Bottom Section (Signatures/Footer):**
+- Signature characteristics (if present)
+- Stamp/seal quality and placement
+- Footer text consistency
+- Date fields in this section
+
+**Margins and Backgrounds:**
+- Background uniformity
+- Edge artifacts or boundaries
+- Unusual blank spaces
+- Cutout patterns or rectangular voids
+
+### 4. SPECIFIC TAMPERING REGIONS (If Detected)
+For EACH suspected tampered region, provide:
+- **Exact location**: "Top center, in the 'Patient Name' field, approximately 3cm from top"
+- **Dimensions**: Approximate size of affected area
+- **What you see**: Detailed description of the visual appearance
+- **Specific anomalies**: 
+  * Font differences (size, weight, style, rendering)
+  * Color mismatches (RGB values appear different)
+  * Edge artifacts (hard edges, unnatural boundaries, halos)
+  * Alignment issues (text not on same baseline, rotated slightly)
+  * Background discontinuities (pattern breaks, texture changes)
+  * Shadow inconsistencies (different lighting direction)
+  * Resolution mismatches (one area sharper/blurrier than surroundings)
+- **Forensic correlation**: How do the math metrics support this finding?
+- **Tampering method hypothesis**: What technique was likely used? (copy-paste, text overlay, image editing, scanning, re-photographing)
+
+### 5. COMPARATIVE ANALYSIS
+- Compare similar elements: Do all similar fields look the same?
+- Text consistency: Same font throughout? Same rendering quality?
+- Signature analysis: If multiple signatures, are they consistent?
+- Date field comparison: Do date formats and fonts match?
+- Stamp/seal analysis: Quality, placement, ink consistency
+
+### 6. TEMPORAL AND LOGICAL ANALYSIS
+- Date consistency: Do dates make logical sense?
+- Document age indicators: Does wear/aging appear uniform?
+- Information coherence: Does all information fit together logically?
+- Expected vs. actual: Does document match expected standards for this type?
+
+### 7. TAMPERING TECHNIQUE IDENTIFICATION
+If tampering detected, identify the likely method:
+- Digital editing (Photoshop, GIMP, etc.) - describe evidence
+- Copy-paste from another document - describe boundaries
+- Text overlay/replacement - describe font/rendering differences
+- Scanning/re-printing - describe quality degradation patterns
+- Re-photographing/screenshot - describe compression artifacts
+- Hybrid methods - describe combination of techniques
+
+### 8. AUTHENTICITY CHAIN OF EVIDENCE
+Build a logical argument:
+- If authentic: List 5+ specific reasons with evidence
+- If tampered: Build the case step-by-step with evidence chain
+- Address counter-arguments: Why alternative explanations don't fit
+
+**Output Format (JSON):**
+{{
+  "tampering_detected": true/false,
+  "confidence_score": 0-100,
+  "risk_level": "CRITICAL/HIGH/MEDIUM/LOW/NONE",
+  
+  "document_identification": {{
+    "document_type": "Specific type",
+    "document_purpose": "What this document is for",
+    "expected_format_description": "Detailed description of standard format",
+    "visible_fields_and_sections": ["List all visible fields with locations"],
+    "security_features_present": ["List all security features observed"],
+    "quality_assessment": "Overall quality description"
+  }},
+  
+  "forensic_visual_correlation": {{
+    "ela_analysis": {{
+      "hot_regions_description": "Detailed description of where ELA shows anomalies",
+      "visual_appearance": "What these regions look like visually",
+      "conclusion": "What this means"
+    }},
+    "rgb_variance_analysis": {{
+      "high_variance_regions": "Where and why",
+      "low_variance_regions": "Where and why",
+      "color_consistency_assessment": "Detailed color analysis"
+    }},
+    "noise_pattern_analysis": {{
+      "smooth_regions": "Detailed description",
+      "noisy_regions": "Detailed description",
+      "texture_assessment": "Overall texture consistency"
+    }},
+    "overall_correlation": "How all forensic metrics work together"
+  }},
+  
+  "region_by_region_analysis": {{
+    "header_section": "Detailed analysis of top section",
+    "main_content": "Detailed analysis of middle section",
+    "footer_section": "Detailed analysis of bottom section",
+    "margins_and_background": "Analysis of surrounding areas"
+  }},
+  
+  "tampering_regions": [
+    {{
+      "region_id": 1,
+      "exact_location": "Precise description of where (e.g., 'Top center, Patient Name field, 2-3cm from top edge')",
+      "approximate_dimensions": "Size of affected area",
+      "visual_description": "What you see in detail",
+      "specific_anomalies": [
+        "Detailed list of what's wrong"
+      ],
+      "forensic_evidence": "How math supports this",
+      "suspected_tampering_method": "Likely technique used",
+      "confidence_this_region": "0-100"
+    }}
+  ],
+  
+  "comparative_analysis": {{
+    "similar_elements_consistency": "Do similar fields match?",
+    "text_rendering_consistency": "Font and rendering analysis",
+    "signature_analysis": "If applicable",
+    "date_fields_analysis": "Date consistency check",
+    "stamps_seals_analysis": "If applicable"
+  }},
+  
+  "temporal_logical_analysis": {{
+    "date_consistency": "Do dates make sense?",
+    "document_age_assessment": "Aging/wear analysis",
+    "information_coherence": "Does info fit together?",
+    "standards_compliance": "Matches expected standards?"
+  }},
+  
+  "tampering_technique_identification": {{
+    "primary_method": "Main technique identified",
+    "evidence_for_method": ["Detailed evidence list"],
+    "tool_indicators": "Signs of specific software/tools",
+    "skill_level_assessment": "Amateur vs. professional forgery"
+  }},
+  
+  "authenticity_evidence_chain": {{
+    "main_argument": "Overall logical argument",
+    "supporting_evidence": ["Ordered list of evidence points"],
+    "counter_arguments_addressed": ["Alternative explanations and why they don't fit"],
+    "conclusion_reasoning": "Final logical conclusion"
+  }},
+  
+  "overall_assessment": "Comprehensive summary integrating all findings above",
+  
+  "detected_anomalies": [
+    {{
+      "category": "Visual/Content/Image/Structural/Digital/Semantic",
+      "issue": "Specific issue description",
+      "severity": "CRITICAL/HIGH/MEDIUM/LOW",
+      "location": "Exact location in document",
+      "detailed_evidence": "Extensive description of evidence",
+      "forensic_support": "How forensic data supports this",
+      "visual_appearance": "What it looks like"
+    }}
+  ],
+  
+  "authenticity_indicators": ["Detailed list of positive markers"],
+  "red_flags": ["Detailed list of suspicious elements"],
+  
+  "technical_findings": {{
+    "font_consistency": "Detailed assessment",
+    "color_uniformity": "Detailed assessment",
+    "edge_analysis": "Detailed assessment",
+    "compression_artifacts": "Detailed assessment",
+    "resolution_consistency": "Detailed assessment",
+    "lighting_consistency": "Detailed assessment"
+  }},
+  
+  "recommendations": [
+    "Specific, actionable recommendations with reasoning"
+  ],
+  
+  "detailed_reasoning": "EXTENSIVE multi-paragraph explanation that walks through the entire analysis process, integrating forensic mathematics with visual observations, explaining the logical chain of evidence, and arriving at the final conclusion. This should be at least 500-1000 words of detailed reasoning."
+}}
+
+**CRITICAL REMINDERS:**
+- Be EXTREMELY detailed and specific - mention exact locations, measurements, colors, patterns
+- Don't just classify - DESCRIBE what you see in detail
+- Connect EVERY forensic metric to visual observations
+- Provide extensive reasoning, not brief summaries
+- Build a logical evidence chain
+- Think like you're testifying in court - provide irrefutable evidence and reasoning

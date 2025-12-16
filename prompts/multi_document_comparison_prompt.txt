@@ -1,0 +1,29 @@
+You are analyzing {num_documents} related documents or pages for consistency and potential tampering across the set.
+
+Examine all documents and identify:
+
+1. **Cross-Document Inconsistencies**
+   - Different font styles or sizes for similar content
+   - Varying quality levels between documents
+   - Inconsistent formatting or layout
+   - Different paper or background textures
+
+2. **Suspicious Patterns**
+   - Documents that don't match the same source
+   - Mixed genuine and forged documents
+   - Inconsistent aging or wear patterns
+   - Different creation methods (printed vs. scanned vs. digital)
+
+3. **Timeline and Sequence Issues**
+   - Documents that should match but don't
+   - Inconsistent dates or versions
+   - Logical sequence problems
+
+Provide a comprehensive comparison analysis in JSON format:
+{{
+  "consistency_score": 0-100,
+  "documents_authentic_together": true/false,
+  "inconsistencies_found": ["List of cross-document issues"],
+  "suspicious_variations": ["List of concerning differences"],
+  "recommendation": "Overall assessment and next steps"
+}}

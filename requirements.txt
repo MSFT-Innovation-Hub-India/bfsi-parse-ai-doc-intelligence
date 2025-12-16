@@ -1,0 +1,63 @@
+# ============================================
+# Backend API Server Dependencies
+# ============================================
+
+# Web Framework
+flask==2.3.3
+flask-cors==4.0.0
+python-multipart==0.0.6
+Werkzeug==2.3.7
+
+# Azure Services
+azure-storage-blob==12.19.0
+
+# OpenAI & AI
+openai==1.54.0
+
+# PDF Processing
+PyMuPDF==1.24.0
+
+# Image Processing
+Pillow==10.1.0
+
+# Utilities
+python-dotenv==1.0.0
+
+# ============================================
+# Frontend Dependencies (Node.js/npm)
+# Install with: cd hospital-frontend && npm install
+# ============================================
+# 
+# Main framework and build tools:
+# - next@^14.0.0
+# - react@^18.0.0
+# - react-dom@^18.0.0
+# - typescript@^5.0.0
+# 
+# UI Components and Styling:
+# - tailwindcss@^3.3.0
+# - @headlessui/react@^1.7.17
+# - @heroicons/react@^2.0.18
+# - framer-motion@^10.16.0
+# - lucide-react@^0.294.0
+# - clsx@^2.0.0
+# 
+# Document handling:
+# - react-dropzone@^14.2.3
+# - react-markdown@^10.1.0
+# - remark-gfm@^4.0.1
+# 
+# UI Utilities:
+# - react-hot-toast@^2.4.1
+# - date-fns@^2.30.0
+# - recharts@^2.8.0
+# 
+# Development tools:
+# - autoprefixer@^10.4.0
+# - postcss@^8.4.0
+# - eslint@^8.0.0
+# - eslint-config-next@^14.0.0
+# - @typescript-eslint/eslint-plugin@^6.0.0
+# - @typescript-eslint/parser@^6.0.0
+# - @tailwindcss/forms@^0.5.6
+# - @tailwindcss/typography@^0.5.10
