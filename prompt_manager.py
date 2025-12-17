@@ -153,16 +153,22 @@ def get_fake_document_system_prompt() -> str:
 
 
 def get_integrated_tampering_detection_prompt(forensic_summary: str, 
-                                               ela_hot_pixels: str, 
-                                               mean_rgb_std: str,
-                                               mean_local_variance: str, 
-                                               ssim_score: str) -> str:
+                                               ela_hot_pixels: str = "0.0", 
+                                               tampered_regions_count: str = "0",
+                                               copy_move_matches: str = "0", 
+                                               noise_threshold: str = "120",
+                                               mean_rgb_std: str = "0.0",
+                                               mean_local_variance: str = "0.0", 
+                                               ssim_score: str = "1.0") -> str:
     """
     Get the integrated tampering detection prompt with forensic data.
     
     Args:
         forensic_summary: Full forensic analysis summary
         ela_hot_pixels: ELA hot pixels percentage
+        tampered_regions_count: Number of tampered regions detected
+        copy_move_matches: Number of copy-move matches
+        noise_threshold: Threshold used in noise analysis
         mean_rgb_std: RGB channel standard deviation
         mean_local_variance: Local variance mean
         ssim_score: SSIM score
@@ -175,6 +181,9 @@ def get_integrated_tampering_detection_prompt(forensic_summary: str,
     # Replace placeholders
     prompt = prompt_template.replace("{forensic_summary}", forensic_summary)
     prompt = prompt.replace("{ela_hot_pixels}", ela_hot_pixels)
+    prompt = prompt.replace("{tampered_regions_count}", tampered_regions_count)
+    prompt = prompt.replace("{copy_move_matches}", copy_move_matches)
+    prompt = prompt.replace("{noise_threshold}", noise_threshold)
     prompt = prompt.replace("{mean_rgb_std}", mean_rgb_std)
     prompt = prompt.replace("{mean_local_variance}", mean_local_variance)
     prompt = prompt.replace("{ssim_score}", ssim_score)

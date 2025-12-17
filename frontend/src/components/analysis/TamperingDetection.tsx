@@ -34,15 +34,38 @@ interface ForensicAnalysis {
   reasons: string[];
   metrics: {
     ela_hot_pixels_ratio: number;
-    mean_rgb_std: number;
-    mean_local_variance: number;
-    ssim_score: number;
+    tampered_regions_count: number;
+    copy_move_matches: number;
+    noise_threshold: number;
+    noise_global_mean: number;
+  };
+  tampered_regions?: Array<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    area: number;
+    confidence: number;
+    intensity_ratio: number;
+    reasons: string[];
+  }>;
+  copy_move_regions?: Array<{
+    point1: [number, number];
+    point2: [number, number];
+    confidence: number;
+  }>;
+  scan_info?: {
+    is_scanned: boolean;
+    confidence: number;
+    reasons: string[];
   };
   outputDir: string;
   images: {
     ela: string;
-    rgb_std: string;
-    local_var: string;
+    noise_analysis: string;
+    noise_regions: string;
+    noise_anomaly: string;
+    copy_move?: string;
   };
 }
 
@@ -461,12 +484,16 @@ export default function TamperingDetection() {
                         <span className="font-medium">{(currentPage.forensicAnalysis.metrics.ela_hot_pixels_ratio * 100).toFixed(2)}%</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">RGB Std Dev:</span>
-                        <span className="font-medium">{currentPage.forensicAnalysis.metrics.mean_rgb_std.toFixed(2)}</span>
+                        <span className="text-gray-600">Tampered Regions:</span>
+                        <span className="font-medium">{currentPage.forensicAnalysis.metrics.tampered_regions_count}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">SSIM Score:</span>
-                        <span className="font-medium">{currentPage.forensicAnalysis.metrics.ssim_score.toFixed(4)}</span>
+                        <span className="text-gray-600">Copy-Move Matches:</span>
+                        <span className="font-medium">{currentPage.forensicAnalysis.metrics.copy_move_matches}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Noise Threshold:</span>
+                        <span className="font-medium">{currentPage.forensicAnalysis.metrics.noise_threshold}</span>
                       </div>
                     </div>
 
