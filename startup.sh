@@ -18,10 +18,8 @@ cd "$APP_ROOT"
 echo "Current directory: $(pwd)"
 echo "Python version: $(python --version)"
 
-# Install dependencies from root requirements.txt
-echo "Installing Python dependencies..."
-pip install --upgrade pip
-pip install -r requirements.txt
+# Note: Dependencies are installed during Azure deployment (SCM_DO_BUILD_DURING_DEPLOYMENT=true)
+# No need to run pip install here - it's already done in the build phase
 
 # Create uploads directory if it doesn't exist
 echo "Creating upload directories..."
