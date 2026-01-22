@@ -123,7 +123,7 @@ def extract_document_items(file_path: str) -> dict:
         """
         
         response = client.chat.completions.create(
-            model=deployment,
+            model=AzureOpenAIConfig.DEPLOYMENT,
             messages=[
                 {
                     "role": "system",
@@ -137,7 +137,7 @@ def extract_document_items(file_path: str) -> dict:
                     ]
                 }
             ],
-            max_tokens=2048,
+            max_completion_tokens=2048,
             temperature=0.1
         )
         
@@ -276,7 +276,7 @@ def find_bill_to_docs_mismatches(bill_data: Dict, medical_docs: List[Dict]) -> d
         """
         
         response = client.chat.completions.create(
-            model=deployment,
+            model=AzureOpenAIConfig.DEPLOYMENT,
             messages=[
                 {
                     "role": "system",
@@ -287,7 +287,7 @@ def find_bill_to_docs_mismatches(bill_data: Dict, medical_docs: List[Dict]) -> d
                     "content": prompt
                 }
             ],
-            max_tokens=4000,
+            max_completion_tokens=4000,
             temperature=0.1
         )
         
@@ -503,7 +503,7 @@ def find_document_mismatches(document_extracts: List[Dict]) -> dict:
         """
         
         response = client.chat.completions.create(
-            model=deployment,
+            model=AzureOpenAIConfig.DEPLOYMENT,
             messages=[
                 {
                     "role": "system",
@@ -514,7 +514,7 @@ def find_document_mismatches(document_extracts: List[Dict]) -> dict:
                     "content": prompt
                 }
             ],
-            max_tokens=4000,
+            max_completion_tokens=4000,
             temperature=0.05
         )
         

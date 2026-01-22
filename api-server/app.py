@@ -16,10 +16,10 @@ from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
 
 # Add parent directory to path for config import
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from config import AzureStorageConfig, APIConfig, AzureOpenAIConfig, AzureOpenAIXRayConfig, get_openai_client, get_xray_openai_client
+from config import AzureStorageConfig, APIConfig, AzureOpenAIConfig, AzureOpenAIXRayConfig, get_openai_client, get_xray_openai_client, get_blob_service_client
 
-# Add the fraud directory to the path to import existing analysis modules
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'fraud'))
+# Add the medical-analysis directory to the path to import existing analysis modules
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'medical-analysis'))
 
 try:
     from medical_report_analyzer import MedicalReportAnalyzer
@@ -30,13 +30,23 @@ try:
     print("✅ Successfully imported analysis modules")
 except ImportError as e:
     print(f"⚠️  Warning: Could not import analysis modules: {e}")
+    print(f"   Import error details: {type(e).__name__}")
+    import traceback
+    print(f"   Traceback: {traceback.format_exc()}")
     ANALYSIS_MODULES_AVAILABLE = False
 except Exception as e:
     print(f"⚠️  Warning: Error initializing analysis modules: {e}")
+    print(f"   Error details: {type(e).__name__}")
+    import traceback
+    print(f"   Traceback: {traceback.format_exc()}")
     ANALYSIS_MODULES_AVAILABLE = False
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+
+# Configure CORS for Azure App Service
+# In production, restrict to your frontend domain
+ALLOWED_ORIGINS = os.getenv('CORS_ORIGINS', '*').split(',')
+CORS(app, origins=ALLOWED_ORIGINS, supports_credentials=True)
 
 # Configuration from environment variables
 UPLOAD_FOLDER = APIConfig.UPLOAD_FOLDER
@@ -48,13 +58,83 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 # Ensure upload directory exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Azure Blob Storage Configuration from environment
-AZURE_STORAGE_CONNECTION_STRING = AzureStorageConfig.CONNECTION_STRING
+# Azure Blob Storage Configuration from environment (using Managed Identity)
 AZURE_CONTAINER_NAME = AzureStorageConfig.CONTAINER_NAME
 
 # In-memory storage for demo purposes (use database in production)
 analysis_jobs = {}
 uploaded_files = {}
+
+# Persistent storage directory for analysis jobs
+JOBS_STORAGE_DIR = os.path.join(UPLOAD_FOLDER, 'analysis_jobs')
+os.makedirs(JOBS_STORAGE_DIR, exist_ok=True)
+
+def save_job_to_disk(job):
+    """Save analysis job to disk for persistence across server restarts"""
+    try:
+        job_file = os.path.join(JOBS_STORAGE_DIR, f"{job.job_id}.json")
+        job_data = {
+            'job_id': job.job_id,
+            'job_type': job.job_type,
+            'file_paths': job.file_paths,
+            'status': job.status,
+            'progress': job.progress,
+            'result': job.result,
+            'error': job.error,
+            'created_at': job.created_at.isoformat() if job.created_at else None,
+            'completed_at': job.completed_at.isoformat() if job.completed_at else None,
+            'custom_config': job.custom_config,
+            'metadata': job.metadata
+        }
+        import json
+        with open(job_file, 'w', encoding='utf-8') as f:
+            json.dump(job_data, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"Warning: Failed to save job {job.job_id} to disk: {e}")
+
+def load_job_from_disk(job_id):
+    """Load analysis job from disk"""
+    try:
+        job_file = os.path.join(JOBS_STORAGE_DIR, f"{job_id}.json")
+        if not os.path.exists(job_file):
+            return None
+        
+        import json
+        with open(job_file, 'r', encoding='utf-8') as f:
+            job_data = json.load(f)
+        
+        # Reconstruct AnalysisJob object
+        job = AnalysisJob(job_data['job_id'], job_data['job_type'], job_data['file_paths'])
+        job.status = job_data['status']
+        job.progress = job_data['progress']
+        job.result = job_data['result']
+        job.error = job_data['error']
+        job.created_at = datetime.fromisoformat(job_data['created_at']) if job_data['created_at'] else datetime.now()
+        job.completed_at = datetime.fromisoformat(job_data['completed_at']) if job_data['completed_at'] else None
+        job.custom_config = job_data.get('custom_config')
+        job.metadata = job_data.get('metadata', {})
+        
+        return job
+    except Exception as e:
+        print(f"Warning: Failed to load job {job_id} from disk: {e}")
+        return None
+
+def load_all_jobs_from_disk():
+    """Load all analysis jobs from disk on server startup"""
+    try:
+        if not os.path.exists(JOBS_STORAGE_DIR):
+            return
+        
+        for filename in os.listdir(JOBS_STORAGE_DIR):
+            if filename.endswith('.json'):
+                job_id = filename[:-5]  # Remove .json extension
+                job = load_job_from_disk(job_id)
+                if job:
+                    analysis_jobs[job_id] = job
+        
+        print(f"Loaded {len(analysis_jobs)} analysis jobs from disk")
+    except Exception as e:
+        print(f"Warning: Failed to load jobs from disk: {e}")
 
 # Mock customer database
 MOCK_CUSTOMERS = {
@@ -125,13 +205,7 @@ MOCK_CUSTOMERS = {
     }
 }
 
-def get_blob_service_client():
-    """Get Azure Blob Service Client"""
-    try:
-        return BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
-    except Exception as e:
-        print(f"Error connecting to Azure Blob Storage: {e}")
-        return None
+# Note: get_blob_service_client is now imported from config.py and uses Managed Identity
 
 def get_customer_info(customer_id):
     """Get customer information from mock database"""
@@ -844,7 +918,7 @@ def start_custom_analysis():
         custom_instructions = data.get('custom_instructions', '')
         model_name = data.get('model_name', 'gpt-4o')
         temperature = data.get('temperature', 0.3)
-        max_tokens = data.get('max_tokens', 4000)
+        max_completion_tokens = data.get('max_completion_tokens', data.get('max_tokens', 4000))
         document_type = data.get('document_type', 'Custom Document')
         output_format = data.get('output_format', 'Markdown')
         
@@ -868,7 +942,7 @@ def start_custom_analysis():
             'instructions': custom_instructions,
             'model_name': model_name,
             'temperature': temperature,
-            'max_tokens': max_tokens,
+            'max_completion_tokens': max_completion_tokens,
             'document_type': document_type,
             'output_format': output_format
         }
@@ -891,10 +965,19 @@ def start_custom_analysis():
 @app.route('/analysis/<job_id>/status', methods=['GET'])
 def get_analysis_status(job_id):
     """Get analysis job status"""
-    if job_id not in analysis_jobs:
+    # Try to get from memory first
+    job = analysis_jobs.get(job_id)
+    
+    # If not in memory, try loading from disk
+    if not job:
+        job = load_job_from_disk(job_id)
+        if job:
+            # Cache in memory for future requests
+            analysis_jobs[job_id] = job
+    
+    if not job:
         return jsonify({'error': 'Job not found'}), 404
     
-    job = analysis_jobs[job_id]
     response = {
         'jobId': job.job_id,
         'status': job.status,
@@ -1584,7 +1667,7 @@ Please provide a cohesive summary that synthesizes the information from all docu
                             {"role": "user", "content": combined_prompt}
                         ],
                         temperature=0.3,
-                        max_tokens=4000
+                        max_completion_tokens=4000
                     )
                     
                     combined_summary = response.choices[0].message.content
@@ -1692,7 +1775,7 @@ RECOMMENDATIONS:
                     ]
                 }
             ],
-            max_tokens=4096,
+            max_completion_tokens=4096,
             temperature=0.7,
             top_p=1.0
         )
@@ -1733,12 +1816,12 @@ def run_custom_analysis(job):
         custom_instructions = config.get('instructions', 'Analyze this document.')
         model_name = config.get('model_name', 'gpt-4o')
         temperature = config.get('temperature', 0.3)
-        max_tokens = config.get('max_tokens', 4000)
+        max_completion_tokens = config.get('max_completion_tokens', 4000)
         document_type = config.get('document_type', 'Document')
         output_format = config.get('output_format', 'Markdown')
         
         print(f"Starting custom document analysis for {len(job.file_paths)} documents")
-        print(f"Model: {model_name}, Temperature: {temperature}, Max Tokens: {max_tokens}")
+        print(f"Model: {model_name}, Temperature: {temperature}, Max Tokens: {max_completion_tokens}")
         print(f"Document Type: {document_type}, Output Format: {output_format}")
         
         # Use Azure OpenAI configuration from environment
@@ -1773,7 +1856,7 @@ Please analyze the document according to the above instructions."""
                     custom_prompt=custom_prompt,
                     model_name=model_name,
                     temperature=temperature,
-                    max_tokens=max_tokens,
+                    max_completion_tokens=max_completion_tokens,
                     doc_number=i+1
                 )
                 
@@ -1836,7 +1919,7 @@ Please provide a cohesive summary."""
                         {"role": "user", "content": combined_prompt}
                     ],
                     temperature=temperature,
-                    max_tokens=max_tokens
+                    max_completion_tokens=max_completion_tokens
                 )
                 
                 combined_summary = response.choices[0].message.content
@@ -1944,6 +2027,7 @@ def run_tampering_detection(job):
     try:
         job.status = 'processing'
         job.progress = 10
+        save_job_to_disk(job)  # Save initial status
         
         print(f"Starting tampering detection for {len(job.file_paths)} document(s)")
         
@@ -1952,6 +2036,7 @@ def run_tampering_detection(job):
         from integrated_tampering_detector import IntegratedTamperingDetector
         
         job.progress = 20
+        save_job_to_disk(job)
         
         # Initialize detector
         detector = IntegratedTamperingDetector(output_dir=os.path.join(UPLOAD_FOLDER, 'tampering_reports'))
@@ -1961,11 +2046,13 @@ def run_tampering_detection(job):
         print(f"Analyzing: {os.path.basename(file_path)}")
         
         job.progress = 40
+        save_job_to_disk(job)
         
         # Perform analysis
         results = detector.analyze_document(file_path)
         
         job.progress = 80
+        save_job_to_disk(job)
         
         if 'error' in results:
             raise Exception(results['error'])
@@ -2010,6 +2097,7 @@ def run_tampering_detection(job):
         job.progress = 100
         job.status = 'completed'
         job.completed_at = datetime.now()
+        save_job_to_disk(job)  # Save final status
         
     except Exception as e:
         print(f"Error in tampering detection: {str(e)}")
@@ -2017,6 +2105,7 @@ def run_tampering_detection(job):
         print(f"Full traceback: {traceback.format_exc()}")
         job.status = 'failed'
         job.error = str(e)
+        save_job_to_disk(job)  # Save error status
 
 @app.route('/analyze/fake-document', methods=['POST'])
 def start_fake_document_detection():
@@ -2067,6 +2156,7 @@ def start_tampering_detection():
         job_id = str(uuid.uuid4())
         job = AnalysisJob(job_id, 'tampering', [uploaded_files[document_id]['file_path']])
         analysis_jobs[job_id] = job
+        save_job_to_disk(job)  # Save job immediately to disk
         
         # Start analysis in background thread
         thread = threading.Thread(target=run_tampering_detection, args=(job,))
@@ -2218,6 +2308,9 @@ if __name__ == '__main__':
     
     # Scan uploads folder to rebuild file registry
     scan_uploads_folder()
+    
+    # Load existing analysis jobs from disk
+    load_all_jobs_from_disk()
     
     print(f"API will be available at http://{APIConfig.HOST}:{APIConfig.PORT}")
     app.run(debug=APIConfig.DEBUG, host=APIConfig.HOST, port=APIConfig.PORT)

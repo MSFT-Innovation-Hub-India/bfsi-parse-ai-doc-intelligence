@@ -119,3 +119,4 @@ coverage.xml
 *.backup
 *~
 land doc
+AZURE_DEPLOYMENT.md

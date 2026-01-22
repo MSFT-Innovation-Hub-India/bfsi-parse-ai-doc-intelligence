@@ -365,7 +365,7 @@ class FakeDocumentDetector:
             response = self.client.chat.completions.create(
                 model=AzureOpenAIConfig.DEPLOYMENT,
                 messages=messages,
-                max_tokens=4000,
+                max_completion_tokens=4000,
                 temperature=0.1  # Low temperature for consistent analysis
             )
             

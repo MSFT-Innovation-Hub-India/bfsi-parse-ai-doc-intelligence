@@ -213,7 +213,7 @@ class GenericDocumentAnalyzer:
                         "content": user_content
                     }
                 ],
-                max_tokens=16000,  # Increased significantly for multi-page analysis
+                max_completion_tokens=16000,  # Increased significantly for multi-page analysis
                 temperature=0.1,  # Very low temperature for maximum accuracy and detail
                 top_p=0.95
             )
@@ -255,7 +255,7 @@ class GenericDocumentAnalyzer:
     
     def analyze_document_with_custom_prompt(self, image_path: str, custom_prompt: str, 
                                              model_name: str = None, temperature: float = 0.3, 
-                                             max_tokens: int = 4000, doc_number: int = 1) -> Dict[str, Any]:
+                                             max_completion_tokens: int = 4000, doc_number: int = 1) -> Dict[str, Any]:
         """Analyze a single document with custom instructions and parameters"""
         doc_name = os.path.basename(image_path)
         print(f"🔍 Analyzing document {doc_number}: {doc_name} (Custom Analysis)")
@@ -348,7 +348,7 @@ class GenericDocumentAnalyzer:
                         "content": user_content
                     }
                 ],
-                max_tokens=max_tokens,
+                max_completion_tokens=max_completion_tokens,
                 temperature=temperature,
                 top_p=0.95
             )

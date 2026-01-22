@@ -632,7 +632,7 @@ Forensic Indicators:
                     }
                 ],
                 temperature=0.1,
-                max_tokens=16000,
+                max_completion_tokens=16000,
                 response_format={"type": "json_object"}
             )
             
@@ -729,17 +729,38 @@ Forensic Indicators:
         llm_confidence = llm.get('confidence_score', 0) / 100.0
         llm_tampering = llm.get('tampering_detected', False)
         
-        # Combined score (weighted average)
-        combined_score = (forensic_score * 0.4 + llm_confidence * 0.6) if llm_tampering else (forensic_score * 0.4)
+        # Agreement check - both must agree for high confidence
+        forensic_says_tampered = forensic_score > 0.45
+        llm_says_tampered = llm_tampering and llm_confidence > 0.5
         
-        # Determine final verdict
-        if combined_score > 0.7 or (forensic_score > 0.6 and llm_tampering):
-            verdict = "TAMPERING DETECTED - HIGH CONFIDENCE"
-            risk = "CRITICAL"
-        elif combined_score > 0.5 or (forensic_score > 0.45 and llm_tampering):
-            verdict = "LIKELY TAMPERED - MEDIUM CONFIDENCE"
-            risk = "HIGH"
-        elif combined_score > 0.3 or forensic_score > 0.35:
+        # If they agree, use combined score; if they disagree, be conservative
+        if forensic_says_tampered == llm_says_tampered:
+            # Agreement - use weighted average
+            agreement = 'AGREE'
+            if llm_says_tampered:
+                combined_score = (forensic_score * 0.5 + llm_confidence * 0.5)
+            else:
+                combined_score = (forensic_score * 0.5 + (1 - llm_confidence) * 0.5) * 0.5  # Low score when both say clean
+        else:
+            # Disagreement - be conservative, lean toward "needs review"
+            agreement = 'DISAGREE'
+            combined_score = (forensic_score + llm_confidence) / 2  # Simple average
+            # Cap at medium confidence when disagreement
+            combined_score = min(combined_score, 0.6)
+        
+        # Determine final verdict based on agreement and scores
+        if agreement == 'AGREE' and forensic_says_tampered and llm_says_tampered:
+            if combined_score > 0.7:
+                verdict = "TAMPERING DETECTED - HIGH CONFIDENCE"
+                risk = "CRITICAL"
+            else:
+                verdict = "LIKELY TAMPERED"
+                risk = "HIGH"
+        elif agreement == 'DISAGREE':
+            # When forensic and AI disagree, require human review
+            verdict = "INCONCLUSIVE - REQUIRES MANUAL REVIEW"
+            risk = "MEDIUM"
+        elif combined_score > 0.35:
             verdict = "POSSIBLE TAMPERING - REQUIRES REVIEW"
             risk = "MEDIUM"
         else:
@@ -752,13 +773,37 @@ Forensic Indicators:
             'risk_level': risk,
             'forensic_contribution': forensic_score,
             'llm_contribution': llm_confidence,
-            'agreement': 'AGREE' if (forensic_score > 0.45) == llm_tampering else 'DISAGREE'
+            'agreement': agreement,
+            'forensic_verdict': 'TAMPERED' if forensic_says_tampered else 'ORIGINAL',
+            'llm_verdict': 'TAMPERED' if llm_says_tampered else 'ORIGINAL'
         }
     
     def _create_summary(self, results: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Create summary of all analyses"""
         
-        tampering_detected = any(r['integrated_verdict']['combined_score'] > 0.5 for r in results)
+        # Check if any page has tampering detected or is inconclusive
+        def page_has_issues(r):
+            verdict = r['integrated_verdict'].get('verdict', '')
+            llm_detected = r['llm_analysis'].get('tampering_detected', False)
+            forensic_score = r['forensic_analysis']['forensic_score']
+            # Tampering if: high combined score, OR inconclusive, OR LLM detected with high confidence
+            return (
+                r['integrated_verdict']['combined_score'] > 0.5 or
+                'INCONCLUSIVE' in verdict or
+                (llm_detected and r['llm_analysis'].get('confidence_score', 0) >= 60)
+            )
+        
+        tampering_detected = any(page_has_issues(r) for r in results)
+        
+        # Determine summary status text
+        any_inconclusive = any('INCONCLUSIVE' in r['integrated_verdict'].get('verdict', '') for r in results)
+        if any_inconclusive:
+            status_text = 'INCONCLUSIVE - MANUAL REVIEW REQUIRED'
+        elif tampering_detected:
+            status_text = 'TAMPERING DETECTED'
+        else:
+            status_text = 'NO TAMPERING DETECTED'
+        
         max_risk = max((r['integrated_verdict']['risk_level'] for r in results),
                       key=lambda x: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].index(x))
         
@@ -768,6 +813,7 @@ Forensic Indicators:
         
         return {
             'tampering_detected': tampering_detected,
+            'status_text': status_text,
             'highest_risk_level': max_risk,
             'pages_analyzed': len(results),
             'total_anomalies_found': total_anomalies,

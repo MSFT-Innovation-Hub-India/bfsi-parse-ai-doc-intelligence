@@ -139,7 +139,7 @@ class MedicalReportAnalyzer:
                         ]
                     }
                 ],
-                max_tokens=4096,
+                max_completion_tokens=4096,
                 temperature=0.2,  # Lower temperature for more consistent medical analysis
                 top_p=0.95
             )

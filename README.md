@@ -7,10 +7,11 @@ AI-powered document analysis system using Azure OpenAI GPT-4 Vision for medical 
 - **Document Analysis** - Medical reports, X-rays, generic documents, batch processing
 - **Fraud Detection** - Cross-document comparison, fake detection, tampering analysis
 - **Customer Management** - Upload, storage, analysis history
+- **Secure Authentication** - Uses Azure Managed Identity (no API keys required)
 
 ## Quick Start
 
-**Prerequisites:** Python 3.8+, Node.js 16+, Azure OpenAI API access
+**Prerequisites:** Python 3.8+, Node.js 16+, Azure OpenAI access with Managed Identity
 
 ## Installation
 
@@ -31,15 +32,26 @@ cd ..
 
 # Configure environment
 cp .env.example .env
-# Edit .env with your Azure OpenAI credentials
+# Edit .env with your Azure resource endpoints
 ```
 
 **Required in `.env`:**
 ```env
+# Azure OpenAI (Managed Identity - no API key needed)
 AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
-AZURE_OPENAI_API_KEY=your-api-key
 AZURE_OPENAI_DEPLOYMENT=gpt-4.1
+
+# Azure Blob Storage (Managed Identity - no connection string with keys needed)
+AZURE_STORAGE_ACCOUNT_URL=https://yourstorageaccount.blob.core.windows.net
+AZURE_STORAGE_CONTAINER_NAME=your-container-name
 ```
+
+**Azure RBAC Setup (Required for Managed Identity):**
+1. Enable System-assigned or User-assigned Managed Identity on your Azure resource
+2. Grant the identity **"Cognitive Services OpenAI User"** role on Azure OpenAI resources
+3. Grant the identity **"Storage Blob Data Contributor"** role on the Storage Account
+
+**Local Development:** Uses Azure CLI credentials (`az login`) or VS Code credentials automatically
 
 **Frontend `.env.local`:**
 ```env
@@ -115,6 +127,8 @@ npm run lint         # Lint code
 ## Troubleshooting
 
 - **Import errors:** `pip install -r requirements.txt`
-- **Auth fails:** Check `.env` credentials
+- **Auth fails:** Verify Managed Identity is enabled and RBAC roles are assigned
+- **Local dev auth:** Run `az login` to authenticate with Azure CLI
 - **Frontend connection:** Verify `NEXT_PUBLIC_API_URL`
 - **Analysis fails:** Check Azure OpenAI quota/deployment names
+- **Storage access denied:** Ensure "Storage Blob Data Contributor" role is assigned

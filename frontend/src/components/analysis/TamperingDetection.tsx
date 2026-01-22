@@ -368,7 +368,7 @@ export default function TamperingDetection() {
                 {getRiskIcon(result.summary.highest_risk_level)}
                 <div>
                   <h2 className="text-2xl font-bold">
-                    {result.summary.tampering_detected ? 'Tampering Detected' : 'No Tampering Detected'}
+                    {result.summary.status_text || (result.summary.tampering_detected ? 'Tampering Detected' : 'No Tampering Detected')}
                   </h2>
                   <p className="text-sm opacity-80">Risk Level: {result.summary.highest_risk_level}</p>
                 </div>

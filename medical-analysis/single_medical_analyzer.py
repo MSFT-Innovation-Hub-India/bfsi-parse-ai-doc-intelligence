@@ -11,6 +11,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any
 import sys
+import tempfile
+import fitz  # PyMuPDF
 
 # Add parent directory to path for config import
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -23,7 +25,32 @@ class SingleMedicalImageAnalyzer:
     """Analyze a single medical image and extract comprehensive medical information"""
     
     def __init__(self):
-        self.supported_formats = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif'}
+        self.supported_formats = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.pdf', '.webp'}
+        self.temp_dir = Path(tempfile.gettempdir()) / "medical_analysis_temp"
+        self.temp_dir.mkdir(exist_ok=True)
+    
+    def convert_pdf_to_image(self, pdf_path: str) -> str:
+        """Convert first page of PDF to image"""
+        try:
+            doc = fitz.open(pdf_path)
+            if len(doc) == 0:
+                raise ValueError("PDF has no pages")
+            
+            # Get first page
+            page = doc[0]
+            # Render page to image with 2x zoom for better quality
+            pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+            
+            # Save to temp file
+            temp_image = self.temp_dir / f"temp_{os.path.basename(pdf_path)}.png"
+            pix.save(str(temp_image))
+            
+            doc.close()
+            print(f"✓ Converted PDF to image: {temp_image}")
+            return str(temp_image)
+        except Exception as e:
+            print(f"❌ Error converting PDF: {str(e)}")
+            raise
     
     def encode_image(self, image_path: str) -> str:
         """Encode image to base64 string"""
@@ -51,9 +78,18 @@ class SingleMedicalImageAnalyzer:
         image_name = os.path.basename(image_path)
         print(f"🔍 Analyzing medical image: {image_name}")
         
+        temp_image_path = None
         try:
+            # Convert PDF to image if needed
+            if image_path.lower().endswith('.pdf'):
+                print("📄 Converting PDF to image...")
+                temp_image_path = self.convert_pdf_to_image(image_path)
+                processing_path = temp_image_path
+            else:
+                processing_path = image_path
+            
             # Encode image to base64
-            base64_image = self.encode_image(image_path)
+            base64_image = self.encode_image(processing_path)
             
             # Define medical analysis prompt
             analysis_prompt = """
@@ -106,7 +142,7 @@ class SingleMedicalImageAnalyzer:
                         ]
                     }
                 ],
-                max_tokens=4096,
+                max_completion_tokens=4096,
                 temperature=0.2,  # Lower temperature for consistent medical analysis
                 top_p=0.95
             )
@@ -135,6 +171,14 @@ class SingleMedicalImageAnalyzer:
                 "error": str(e),
                 "medical_analysis": f"Analysis failed: {str(e)}"
             }
+        finally:
+            # Clean up temporary image if created
+            if temp_image_path and os.path.exists(temp_image_path):
+                try:
+                    os.remove(temp_image_path)
+                    print(f"🗑️ Cleaned up temporary file")
+                except:
+                    pass
     
     def create_report(self, analysis_data: Dict[str, Any]) -> str:
         """Create a formatted medical report"""
