@@ -8,6 +8,15 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'api-server/**'
+      - 'medical-analysis/**'
+      - 'docufraud/**'
+      - 'config.py'
+      - 'requirements.txt'
+      - 'startup.sh'
+      - 'wsgi.py'
+      - 'prompts/**'
   workflow_dispatch:
 
 jobs:
