@@ -39,10 +39,19 @@ jobs:
         working-directory: ./frontend
         run: |
           # Use Next.js standalone output for Azure
-          mkdir -p ../deploy/.next
+          mkdir -p ../deploy
+          # Copy standalone server and node_modules
           cp -r .next/standalone/* ../deploy/
+          # Create .next directory and copy static files
+          mkdir -p ../deploy/.next
           cp -r .next/static ../deploy/.next/
+          # Copy public folder if exists
           if [ -d "public" ]; then cp -r public ../deploy/; fi
+          # List contents for debugging
+          echo "Deploy folder contents:"
+          ls -la ../deploy/
+          echo ".next folder contents:"
+          ls -la ../deploy/.next/
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
