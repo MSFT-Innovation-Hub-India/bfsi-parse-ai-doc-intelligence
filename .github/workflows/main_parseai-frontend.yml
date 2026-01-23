@@ -29,7 +29,7 @@ jobs:
       - name: npm install and build
         working-directory: ./frontend
         env:
-          NEXT_PUBLIC_API_URL: https://parse-ai.azurewebsites.net
+          NEXT_PUBLIC_API_URL: https://parse-ai-ahhrgyg9awftghhq.eastus2-01.azurewebsites.net
           NEXT_PUBLIC_APP_NAME: Intelligent Document Processing
           NEXT_PUBLIC_APP_VERSION: 1.0.0
         run: |
@@ -114,6 +114,7 @@ jobs:
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
-          app-name: 'parseai-frontend'
+          app-name: 'parseai-frontend-hbfzbsdzakggdsc4'
           slot-name: 'Production'
           package: ./site
+          clean: true
