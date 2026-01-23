@@ -35,40 +35,33 @@ jobs:
         run: |
           npm install
           npm run build
-          
-          # Debug: Check if standalone output exists
-          echo "=== Checking .next folder ==="
-          ls -la .next/
-          echo "=== Checking standalone folder ==="
-          ls -la .next/standalone/ || echo "standalone folder NOT FOUND"
-          echo "=== Checking standalone .next folder ==="
-          ls -la .next/standalone/.next/ || echo "standalone .next folder NOT FOUND"
 
       - name: Prepare deployment package
         working-directory: ./frontend
         run: |
-          # Check if standalone output exists
-          if [ -d ".next/standalone" ]; then
-            echo "Using Next.js standalone output"
-            mkdir -p ../deploy
-            cp -r .next/standalone/* ../deploy/
-            cp -r .next/static ../deploy/.next/
-            if [ -d "public" ]; then cp -r public ../deploy/; fi
-          else
-            echo "Standalone not found, using traditional deployment"
-            mkdir -p ../deploy
-            cp -r .next ../deploy/
-            cp -r node_modules ../deploy/
-            cp package.json ../deploy/
-            cp next.config.js ../deploy/
-            if [ -d "public" ]; then cp -r public ../deploy/; fi
-          fi
+          # Traditional Next.js deployment (no standalone)
+          mkdir -p ../deploy
           
-          # Debug: List final contents
-          echo "=== Deploy folder root ==="
+          # Copy built .next folder
+          cp -r .next ../deploy/
+          
+          # Copy node_modules
+          cp -r node_modules ../deploy/
+          
+          # Copy required files
+          cp package.json ../deploy/
+          cp next.config.js ../deploy/
+          
+          # Copy public folder if exists
+          if [ -d "public" ]; then cp -r public ../deploy/; fi
+          
+          # Debug output
+          echo "=== Deploy folder contents ==="
           ls -la ../deploy/
-          echo "=== Deploy .next folder ==="
-          ls -la ../deploy/.next/ || echo ".next folder NOT FOUND"
+          echo "=== .next folder contents ==="
+          ls -la ../deploy/.next/
+          echo "=== Checking for BUILD_ID ==="
+          cat ../deploy/.next/BUILD_ID || echo "BUILD_ID not found"
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
