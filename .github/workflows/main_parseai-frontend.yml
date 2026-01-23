@@ -114,7 +114,7 @@ jobs:
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
-          app-name: 'parseai-frontend-hbfzbsdzakggdsc4'
+          app-name: 'parseai-frontend'
           slot-name: 'Production'
           package: ./site
           clean: true
