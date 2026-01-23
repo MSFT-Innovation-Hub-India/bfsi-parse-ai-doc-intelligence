@@ -17,6 +17,7 @@ on:
       - 'startup.sh'
       - 'wsgi.py'
       - 'prompts/**'
+      - '.github/workflows/main_parse-ai.yml'
   workflow_dispatch:
 
 jobs:
