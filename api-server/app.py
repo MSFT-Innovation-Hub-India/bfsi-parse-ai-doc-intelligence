@@ -262,6 +262,21 @@ def debug_uploaded_files():
         'uploaded_files': list(uploaded_files.keys())
     })
 
+@app.route('/', methods=['GET'])
+def index():
+    """Root endpoint - API information"""
+    return jsonify({
+        'name': 'Parse-AI Document Analysis API',
+        'version': '1.0.0',
+        'status': 'running',
+        'endpoints': {
+            'health': '/health',
+            'customers': '/customers',
+            'upload': '/upload',
+            'analyze': '/analyze/*'
+        }
+    })
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """System health check endpoint"""
