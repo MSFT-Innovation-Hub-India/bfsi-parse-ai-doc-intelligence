@@ -287,6 +287,50 @@ def health_check():
         'active_jobs': len([job for job in analysis_jobs.values() if job.status == 'processing'])
     })
 
+@app.route('/debug/paths', methods=['GET'])
+def debug_paths():
+    """Debug endpoint to check Python paths and module availability"""
+    import traceback
+    debug_info = {
+        'python_path': sys.path,
+        'current_dir': os.getcwd(),
+        'file_location': __file__,
+        'analysis_modules_available': ANALYSIS_MODULES_AVAILABLE,
+    }
+    
+    # Try to import modules and capture errors
+    try:
+        from medical_report_analyzer import MedicalReportAnalyzer
+        debug_info['medical_report_analyzer'] = 'OK'
+    except Exception as e:
+        debug_info['medical_report_analyzer'] = f'ERROR: {str(e)}'
+    
+    try:
+        from single_medical_analyzer import SingleMedicalImageAnalyzer
+        debug_info['single_medical_analyzer'] = 'OK'
+    except Exception as e:
+        debug_info['single_medical_analyzer'] = f'ERROR: {str(e)}'
+    
+    try:
+        from generic_document_analyzer_final import GenericDocumentAnalyzer
+        debug_info['generic_document_analyzer'] = 'OK'
+    except Exception as e:
+        debug_info['generic_document_analyzer'] = f'ERROR: {str(e)}'
+    
+    # Check if directories exist
+    base_dir = os.path.dirname(os.path.dirname(__file__))
+    debug_info['base_dir'] = base_dir
+    debug_info['medical_analysis_exists'] = os.path.exists(os.path.join(base_dir, 'medical-analysis'))
+    debug_info['docufraud_exists'] = os.path.exists(os.path.join(base_dir, 'docufraud'))
+    
+    # List contents of base directory
+    try:
+        debug_info['base_dir_contents'] = os.listdir(base_dir)
+    except Exception as e:
+        debug_info['base_dir_contents'] = f'ERROR: {str(e)}'
+    
+    return jsonify(debug_info)
+
 @app.route('/customers', methods=['GET'])
 def list_customers():
     """List all customers"""
