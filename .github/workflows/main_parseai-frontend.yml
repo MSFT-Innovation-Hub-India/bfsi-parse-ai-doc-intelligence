@@ -35,30 +35,40 @@ jobs:
         run: |
           npm install
           npm run build
+          
+          # Debug: Check if standalone output exists
+          echo "=== Checking .next folder ==="
+          ls -la .next/
+          echo "=== Checking standalone folder ==="
+          ls -la .next/standalone/ || echo "standalone folder NOT FOUND"
+          echo "=== Checking standalone .next folder ==="
+          ls -la .next/standalone/.next/ || echo "standalone .next folder NOT FOUND"
 
       - name: Prepare deployment package
         working-directory: ./frontend
         run: |
-          # Use Next.js standalone output for Azure
-          mkdir -p ../deploy
+          # Check if standalone output exists
+          if [ -d ".next/standalone" ]; then
+            echo "Using Next.js standalone output"
+            mkdir -p ../deploy
+            cp -r .next/standalone/* ../deploy/
+            cp -r .next/static ../deploy/.next/
+            if [ -d "public" ]; then cp -r public ../deploy/; fi
+          else
+            echo "Standalone not found, using traditional deployment"
+            mkdir -p ../deploy
+            cp -r .next ../deploy/
+            cp -r node_modules ../deploy/
+            cp package.json ../deploy/
+            cp next.config.js ../deploy/
+            if [ -d "public" ]; then cp -r public ../deploy/; fi
+          fi
           
-          # Copy standalone server and node_modules
-          cp -r .next/standalone/* ../deploy/
-          
-          # The standalone output has its own .next folder but missing static
-          # Copy static files into the standalone's .next folder
-          cp -r .next/static ../deploy/.next/
-          
-          # Copy public folder if exists
-          if [ -d "public" ]; then cp -r public ../deploy/; fi
-          
-          # Debug: List contents
+          # Debug: List final contents
           echo "=== Deploy folder root ==="
           ls -la ../deploy/
           echo "=== Deploy .next folder ==="
-          ls -la ../deploy/.next/ || echo ".next folder not found"
-          echo "=== Deploy .next/static folder ==="
-          ls -la ../deploy/.next/static/ || echo "static folder not found"
+          ls -la ../deploy/.next/ || echo ".next folder NOT FOUND"
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
