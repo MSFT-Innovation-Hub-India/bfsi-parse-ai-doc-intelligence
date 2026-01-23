@@ -11,10 +11,13 @@ gunicorn==21.2.0
 
 # Azure Services
 azure-storage-blob==12.19.0
-azure-identity==1.15.0
+azure-identity==1.19.0
 
 # OpenAI & AI
 openai==1.54.0
+
+# HTTP client (compatible with azure-identity)
+httpx>=0.25.0,<0.28.0
 
 # PDF Processing
 PyMuPDF==1.24.0
