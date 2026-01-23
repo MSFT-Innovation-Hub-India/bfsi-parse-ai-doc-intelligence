@@ -41,18 +41,24 @@ jobs:
         run: |
           # Use Next.js standalone output for Azure
           mkdir -p ../deploy
+          
           # Copy standalone server and node_modules
           cp -r .next/standalone/* ../deploy/
-          # Create .next directory and copy static files
-          mkdir -p ../deploy/.next
+          
+          # The standalone output has its own .next folder but missing static
+          # Copy static files into the standalone's .next folder
           cp -r .next/static ../deploy/.next/
+          
           # Copy public folder if exists
           if [ -d "public" ]; then cp -r public ../deploy/; fi
-          # List contents for debugging
-          echo "Deploy folder contents:"
+          
+          # Debug: List contents
+          echo "=== Deploy folder root ==="
           ls -la ../deploy/
-          echo ".next folder contents:"
-          ls -la ../deploy/.next/
+          echo "=== Deploy .next folder ==="
+          ls -la ../deploy/.next/ || echo ".next folder not found"
+          echo "=== Deploy .next/static folder ==="
+          ls -la ../deploy/.next/static/ || echo "static folder not found"
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
