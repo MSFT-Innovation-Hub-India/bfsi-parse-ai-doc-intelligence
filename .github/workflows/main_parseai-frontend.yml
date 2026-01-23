@@ -27,6 +27,10 @@ jobs:
 
       - name: npm install and build
         working-directory: ./frontend
+        env:
+          NEXT_PUBLIC_API_URL: https://parse-ai.azurewebsites.net
+          NEXT_PUBLIC_APP_NAME: Intelligent Document Processing
+          NEXT_PUBLIC_APP_VERSION: 1.0.0
         run: |
           npm install
           npm run build
