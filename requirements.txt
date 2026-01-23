@@ -24,10 +24,10 @@ PyMuPDF==1.24.0
 
 # Image Processing
 Pillow==10.1.0
-numpy>=1.26.0
+numpy==1.26.4
 opencv-python-headless==4.8.1.78
-scikit-image>=0.22.0
-scipy>=1.11.0
+scikit-image==0.22.0
+scipy==1.11.4
 imagehash>=4.3.0
 
 # HTTP

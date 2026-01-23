@@ -46,7 +46,17 @@ app = Flask(__name__)
 # Configure CORS for Azure App Service
 # In production, restrict to your frontend domain
 ALLOWED_ORIGINS = os.getenv('CORS_ORIGINS', '*').split(',')
-CORS(app, origins=ALLOWED_ORIGINS, supports_credentials=True)
+CORS(app, origins=ALLOWED_ORIGINS, supports_credentials=True, 
+     allow_headers=["Content-Type", "Authorization"],
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+
+# Add CORS headers to all responses including errors
+@app.after_request
+def add_cors_headers(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    return response
 
 # Configuration from environment variables
 UPLOAD_FOLDER = APIConfig.UPLOAD_FOLDER
