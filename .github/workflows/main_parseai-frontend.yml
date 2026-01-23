@@ -31,11 +31,22 @@ jobs:
           npm install
           npm run build
 
+      - name: Prepare deployment package
+        working-directory: ./frontend
+        run: |
+          # Create standalone output for deployment
+          mkdir -p ../deploy
+          cp -r .next ../deploy/
+          cp -r node_modules ../deploy/
+          cp package.json ../deploy/
+          cp next.config.js ../deploy/
+          if [ -d "public" ]; then cp -r public ../deploy/; fi
+
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: ./frontend
+          path: ./deploy
 
   deploy:
     runs-on: ubuntu-latest
@@ -49,6 +60,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: node-app
+          path: ./site
 
       - name: Login to Azure
         uses: azure/login@v2
@@ -63,4 +75,4 @@ jobs:
         with:
           app-name: 'parseai-frontend'
           slot-name: 'Production'
-          package: .
+          package: ./site
