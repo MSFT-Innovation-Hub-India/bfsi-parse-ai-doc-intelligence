@@ -55,6 +55,18 @@ jobs:
           # Copy public folder if exists
           if [ -d "public" ]; then cp -r public ../deploy/; fi
           
+          # CRITICAL: Add deployment marker to completely disable Oryx build
+          echo '[config]' > ../deploy/.deployment
+          echo 'SCM_DO_BUILD_DURING_DEPLOYMENT=false' >> ../deploy/.deployment
+          
+          # Create a simple startup script
+          cat > ../deploy/startup.sh << 'EOF'
+          #!/bin/bash
+          cd /home/site/wwwroot
+          node node_modules/next/dist/bin/next start -p 8080
+          EOF
+          chmod +x ../deploy/startup.sh
+          
           # Debug output
           echo "=== Deploy folder contents ==="
           ls -la ../deploy/
@@ -68,6 +80,7 @@ jobs:
         with:
           name: node-app
           path: ./deploy
+          include-hidden-files: true
 
   deploy:
     runs-on: ubuntu-latest
@@ -82,6 +95,13 @@ jobs:
         with:
           name: node-app
           path: ./site
+
+      - name: Verify downloaded artifact
+        run: |
+          echo "=== Downloaded artifact contents ==="
+          ls -la ./site/
+          echo "=== .next folder exists? ==="
+          ls -la ./site/.next/ || echo ".next NOT FOUND IN ARTIFACT"
 
       - name: Login to Azure
         uses: azure/login@v2
