@@ -16,8 +16,8 @@ mkdir -p /home/site/wwwroot/api-server/uploads/analysis_jobs
 # Start Gunicorn using wsgi.py at root
 echo "Starting Gunicorn..."
 gunicorn --bind=0.0.0.0:${PORT:-8000} \
-         --workers=2 \
-         --threads=4 \
+         --workers=1 \
+         --threads=8 \
          --timeout=300 \
          --access-logfile=- \
          --error-logfile=- \
