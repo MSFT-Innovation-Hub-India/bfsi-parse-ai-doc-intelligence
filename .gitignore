@@ -118,5 +118,6 @@ coverage.xml
 *.bak
 *.backup
 *~
-land doc
-AZURE_DEPLOYMENT.md
+
+# Local test documents (not for version control)
+land doc/

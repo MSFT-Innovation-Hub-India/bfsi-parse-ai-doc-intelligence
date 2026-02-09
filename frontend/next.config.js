@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Removed 'standalone' output for simpler Azure deployment
+  output: 'standalone',
   images: {
     domains: ['localhost'],
   },

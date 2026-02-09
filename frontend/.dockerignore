@@ -1,0 +1,30 @@
+# Dependencies
+node_modules
+
+# Build output
+.next
+out
+
+# Git
+.git
+.gitignore
+
+# Environment files (we'll set env at runtime)
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode
+.idea
+
+# Logs
+*.log
+npm-debug.log*
+
+# Testing
+coverage
+
+# Misc
+.DS_Store
+*.md

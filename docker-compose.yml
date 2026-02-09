@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  # Backend API Server
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: parse-ai-backend
+    ports:
+      - "8000:8000"
+    environment:
+      # Azure OpenAI Configuration
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION:-2024-02-01}
+      - AZURE_OPENAI_DEPLOYMENT=${AZURE_OPENAI_DEPLOYMENT:-gpt-4.1}
+      # Azure OpenAI X-Ray Configuration
+      - AZURE_OPENAI_XRAY_ENDPOINT=${AZURE_OPENAI_XRAY_ENDPOINT}
+      - AZURE_OPENAI_XRAY_API_VERSION=${AZURE_OPENAI_XRAY_API_VERSION:-2024-12-01-preview}
+      - AZURE_OPENAI_XRAY_DEPLOYMENT=${AZURE_OPENAI_XRAY_DEPLOYMENT:-gpt-4o}
+      # Azure Storage Configuration
+      - AZURE_STORAGE_ACCOUNT_URL=${AZURE_STORAGE_ACCOUNT_URL}
+      - AZURE_STORAGE_CONTAINER_NAME=${AZURE_STORAGE_CONTAINER_NAME:-apollo}
+      # API Configuration
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - API_DEBUG=${API_DEBUG:-false}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+    volumes:
+      - uploads:/app/uploads
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend Next.js Application
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    container_name: parse-ai-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  uploads:
+    driver: local
+
+networks:
+  default:
+    name: parse-ai-network

@@ -1,0 +1,41 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.env
+.venv
+venv/
+ENV/
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Node.js (frontend)
+frontend/node_modules
+frontend/.next
+frontend/out
+
+# Local files
+*.log
+*.tmp
+uploads/*
+integrated_reports/*
+tampering_reports/*
+land doc/*
+
+# Documentation
+*.md
+!README.md
+
+# Test files
+tests/
+*.test.py

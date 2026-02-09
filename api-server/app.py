@@ -221,6 +221,56 @@ def get_customer_info(customer_id):
     """Get customer information from mock database"""
     return MOCK_CUSTOMERS.get(customer_id, None)
 
+def get_file_path_for_analysis(doc_id):
+    """Get file path for analysis, downloading from blob storage if needed"""
+    if doc_id not in uploaded_files:
+        return None
+    
+    file_info = uploaded_files[doc_id]
+    
+    # If stored in blob, download to local temp storage
+    if file_info.get('storage_type') == 'blob':
+        blob_name = file_info.get('blob_name')
+        if not blob_name:
+            return None
+        
+        # Check if already downloaded
+        if file_info.get('file_path') and os.path.exists(file_info.get('file_path')):
+            return file_info['file_path']
+        
+        # Download from blob storage
+        try:
+            blob_service_client = get_blob_service_client()
+            if not blob_service_client:
+                print(f"Failed to connect to blob storage for {doc_id}")
+                return None
+            
+            blob_client = blob_service_client.get_blob_client(
+                container=AZURE_CONTAINER_NAME,
+                blob=blob_name
+            )
+            
+            # Create local file path
+            original_name = file_info.get('original_name', os.path.basename(blob_name))
+            local_filename = f"{doc_id}_{original_name}"
+            local_path = os.path.join(UPLOAD_FOLDER, local_filename)
+            
+            # Download blob to local file
+            with open(local_path, "wb") as download_file:
+                download_file.write(blob_client.download_blob().readall())
+            
+            # Update file info with local path
+            file_info['file_path'] = local_path
+            print(f"Downloaded blob {blob_name} to {local_path}")
+            
+            return local_path
+        except Exception as e:
+            print(f"Error downloading blob for {doc_id}: {str(e)}")
+            return None
+    
+    # Return local file path
+    return file_info.get('file_path')
+
 def scan_uploads_folder():
     """Scan uploads folder and rebuild uploaded_files dictionary"""
     uploads_dir = './uploads'
@@ -464,12 +514,52 @@ def view_document(document_id):
             return jsonify({'error': 'Document not found'}), 404
         
         file_info = uploaded_files[document_id]
-        file_path = file_info['file_path']
         
-        if not os.path.exists(file_path):
+        from flask import send_file, Response
+        import io
+        
+        # Check if file is stored in blob storage
+        if file_info.get('storage_type') == 'blob':
+            blob_name = file_info.get('blob_name')
+            if not blob_name:
+                return jsonify({'error': 'Blob reference not found'}), 404
+            
+            # Download from Blob Storage
+            blob_service_client = get_blob_service_client()
+            if not blob_service_client:
+                return jsonify({'error': 'Azure Blob Storage connection failed'}), 500
+            
+            blob_client = blob_service_client.get_blob_client(
+                container=AZURE_CONTAINER_NAME,
+                blob=blob_name
+            )
+            
+            # Download blob content
+            blob_data = blob_client.download_blob().readall()
+            
+            # Determine mimetype based on file extension
+            original_name = file_info.get('original_name', blob_name)
+            if original_name.endswith('.pdf'):
+                mimetype = 'application/pdf'
+            elif original_name.endswith('.webp'):
+                mimetype = 'image/webp'
+            elif original_name.endswith('.png'):
+                mimetype = 'image/png'
+            elif original_name.endswith(('.jpg', '.jpeg')):
+                mimetype = 'image/jpeg'
+            elif original_name.endswith('.bmp'):
+                mimetype = 'image/bmp'
+            elif original_name.endswith(('.tif', '.tiff')):
+                mimetype = 'image/tiff'
+            else:
+                mimetype = 'application/octet-stream'
+            
+            return Response(blob_data, mimetype=mimetype)
+        
+        # Fallback to local file (for backward compatibility)
+        file_path = file_info.get('file_path')
+        if not file_path or not os.path.exists(file_path):
             return jsonify({'error': 'Document file not found on server'}), 404
-        
-        from flask import send_file
         
         # Determine mimetype based on file extension
         if file_path.endswith('.pdf'):
@@ -602,7 +692,7 @@ def download_sample_document(category, blob_path):
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    """Upload medical document files"""
+    """Upload medical document files to Azure Blob Storage"""
     try:
         if 'file' not in request.files:
             return jsonify({'error': 'No file provided'}), 400
@@ -614,26 +704,38 @@ def upload_file():
         if file and allowed_file(file.filename):
             # Generate unique filename
             file_id = str(uuid.uuid4())
-            filename = f"{file_id}_{file.filename}"
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            blob_name = f"uploads/{file_id}_{file.filename}"
             
-            # Save file
-            file.save(file_path)
+            # Upload to Azure Blob Storage
+            blob_service_client = get_blob_service_client()
+            if not blob_service_client:
+                return jsonify({'error': 'Azure Blob Storage connection failed'}), 500
             
-            # Store file info
+            blob_client = blob_service_client.get_blob_client(
+                container=AZURE_CONTAINER_NAME,
+                blob=blob_name
+            )
+            
+            # Read file content and upload
+            file_content = file.read()
+            blob_client.upload_blob(file_content, overwrite=True)
+            
+            # Store file info (with blob reference instead of local path)
             uploaded_files[file_id] = {
                 'id': file_id,
                 'original_name': file.filename,
-                'file_path': file_path,
-                'file_size': os.path.getsize(file_path),
+                'blob_name': blob_name,
+                'file_path': None,  # Will be set when downloaded for analysis
+                'file_size': len(file_content),
                 'uploaded_at': datetime.now().isoformat(),
-                'content_type': file.content_type
+                'content_type': file.content_type,
+                'storage_type': 'blob'
             }
             
             return jsonify({
                 'documentId': file_id,
                 'fileName': file.filename,
-                'fileSize': os.path.getsize(file_path),
+                'fileSize': len(file_content),
                 'uploadedAt': datetime.now().isoformat()
             })
         
@@ -652,12 +754,15 @@ def start_comprehensive_analysis():
         if not document_ids:
             return jsonify({'error': 'No documents provided'}), 400
         
-        # Validate all document IDs exist
+        # Validate all document IDs exist and get file paths
         file_paths = []
         for doc_id in document_ids:
             if doc_id not in uploaded_files:
                 return jsonify({'error': f'Document {doc_id} not found'}), 404
-            file_paths.append(uploaded_files[doc_id]['file_path'])
+            file_path = get_file_path_for_analysis(doc_id)
+            if not file_path:
+                return jsonify({'error': f'Failed to retrieve document {doc_id}'}), 500
+            file_paths.append(file_path)
         
         # Create analysis job
         job_id = str(uuid.uuid4())
@@ -691,9 +796,14 @@ def start_single_analysis():
         if document_id not in uploaded_files:
             return jsonify({'error': 'Document not found'}), 404
         
+        # Get file path (downloads from blob if needed)
+        file_path = get_file_path_for_analysis(document_id)
+        if not file_path:
+            return jsonify({'error': 'Failed to retrieve document'}), 500
+        
         # Create analysis job
         job_id = str(uuid.uuid4())
-        job = AnalysisJob(job_id, 'single', [uploaded_files[document_id]['file_path']])
+        job = AnalysisJob(job_id, 'single', [file_path])
         analysis_jobs[job_id] = job
         
         # Start analysis in background thread
@@ -725,15 +835,22 @@ def start_fraud_analysis():
         if bill_id not in uploaded_files:
             return jsonify({'error': 'Bill document not found'}), 404
         
+        bill_file_path = get_file_path_for_analysis(bill_id)
+        if not bill_file_path:
+            return jsonify({'error': 'Failed to retrieve bill document'}), 500
+        
         medical_file_paths = []
         for doc_id in medical_record_ids:
             if doc_id not in uploaded_files:
                 return jsonify({'error': f'Medical record {doc_id} not found'}), 404
-            medical_file_paths.append(uploaded_files[doc_id]['file_path'])
+            file_path = get_file_path_for_analysis(doc_id)
+            if not file_path:
+                return jsonify({'error': f'Failed to retrieve medical record {doc_id}'}), 500
+            medical_file_paths.append(file_path)
         
         # Create analysis job
         job_id = str(uuid.uuid4())
-        file_paths = [uploaded_files[bill_id]['file_path']] + medical_file_paths
+        file_paths = [bill_file_path] + medical_file_paths
         job = AnalysisJob(job_id, 'fraud', file_paths)
         analysis_jobs[job_id] = job
         
@@ -761,12 +878,15 @@ def start_batch_analysis():
         if not document_ids:
             return jsonify({'error': 'No documents provided'}), 400
         
-        # Validate all document IDs exist
+        # Validate all document IDs exist and get file paths
         file_paths = []
         for doc_id in document_ids:
             if doc_id not in uploaded_files:
                 return jsonify({'error': f'Document {doc_id} not found'}), 404
-            file_paths.append(uploaded_files[doc_id]['file_path'])
+            file_path = get_file_path_for_analysis(doc_id)
+            if not file_path:
+                return jsonify({'error': f'Failed to retrieve document {doc_id}'}), 500
+            file_paths.append(file_path)
         
         # Create analysis job
         job_id = str(uuid.uuid4())
@@ -802,15 +922,22 @@ def start_mismatch_analysis():
         if bill_id not in uploaded_files:
             return jsonify({'error': 'Bill document not found'}), 404
         
+        bill_file_path = get_file_path_for_analysis(bill_id)
+        if not bill_file_path:
+            return jsonify({'error': 'Failed to retrieve bill document'}), 500
+        
         medical_file_paths = []
         for doc_id in medical_record_ids:
             if doc_id not in uploaded_files:
                 return jsonify({'error': f'Medical record {doc_id} not found'}), 404
-            medical_file_paths.append(uploaded_files[doc_id]['file_path'])
+            file_path = get_file_path_for_analysis(doc_id)
+            if not file_path:
+                return jsonify({'error': f'Failed to retrieve medical record {doc_id}'}), 500
+            medical_file_paths.append(file_path)
         
         # Create analysis job
         job_id = str(uuid.uuid4())
-        file_paths = [uploaded_files[bill_id]['file_path']] + medical_file_paths
+        file_paths = [bill_file_path] + medical_file_paths
         job = AnalysisJob(job_id, 'mismatch', file_paths)
         analysis_jobs[job_id] = job
         
@@ -843,15 +970,22 @@ def start_fraud_detection():
         if bill_id not in uploaded_files:
             return jsonify({'error': 'Bill document not found'}), 404
         
+        bill_file_path = get_file_path_for_analysis(bill_id)
+        if not bill_file_path:
+            return jsonify({'error': 'Failed to retrieve bill document'}), 500
+        
         medical_file_paths = []
         for doc_id in medical_record_ids:
             if doc_id not in uploaded_files:
                 return jsonify({'error': f'Medical record {doc_id} not found'}), 404
-            medical_file_paths.append(uploaded_files[doc_id]['file_path'])
+            file_path = get_file_path_for_analysis(doc_id)
+            if not file_path:
+                return jsonify({'error': f'Failed to retrieve medical record {doc_id}'}), 500
+            medical_file_paths.append(file_path)
         
         # Create analysis job
         job_id = str(uuid.uuid4())
-        file_paths = [uploaded_files[bill_id]['file_path']] + medical_file_paths
+        file_paths = [bill_file_path] + medical_file_paths
         job = AnalysisJob(job_id, 'fraud_detection', file_paths)
         analysis_jobs[job_id] = job
         
@@ -884,15 +1018,22 @@ def start_revenue_leakage():
         if bill_id not in uploaded_files:
             return jsonify({'error': 'Bill document not found'}), 404
         
+        bill_file_path = get_file_path_for_analysis(bill_id)
+        if not bill_file_path:
+            return jsonify({'error': 'Failed to retrieve bill document'}), 500
+        
         medical_file_paths = []
         for doc_id in medical_record_ids:
             if doc_id not in uploaded_files:
                 return jsonify({'error': f'Medical record {doc_id} not found'}), 404
-            medical_file_paths.append(uploaded_files[doc_id]['file_path'])
+            file_path = get_file_path_for_analysis(doc_id)
+            if not file_path:
+                return jsonify({'error': f'Failed to retrieve medical record {doc_id}'}), 500
+            medical_file_paths.append(file_path)
         
         # Create analysis job
         job_id = str(uuid.uuid4())
-        file_paths = [uploaded_files[bill_id]['file_path']] + medical_file_paths
+        file_paths = [bill_file_path] + medical_file_paths
         job = AnalysisJob(job_id, 'revenue_leakage', file_paths)
         analysis_jobs[job_id] = job
         
@@ -920,12 +1061,15 @@ def start_general_analysis():
         if not document_ids:
             return jsonify({'error': 'No documents provided'}), 400
         
-        # Validate all document IDs exist
+        # Validate all document IDs exist and get file paths
         file_paths = []
         for doc_id in document_ids:
             if doc_id not in uploaded_files:
                 return jsonify({'error': f'Document {doc_id} not found'}), 404
-            file_paths.append(uploaded_files[doc_id]['file_path'])
+            file_path = get_file_path_for_analysis(doc_id)
+            if not file_path:
+                return jsonify({'error': f'Failed to retrieve document {doc_id}'}), 500
+            file_paths.append(file_path)
         
         # Create analysis job
         job_id = str(uuid.uuid4())
@@ -959,9 +1103,14 @@ def start_xray_analysis():
         if document_id not in uploaded_files:
             return jsonify({'error': 'Document not found'}), 404
         
+        # Get file path (downloads from blob if needed)
+        file_path = get_file_path_for_analysis(document_id)
+        if not file_path:
+            return jsonify({'error': 'Failed to retrieve document'}), 500
+        
         # Create analysis job
         job_id = str(uuid.uuid4())
-        job = AnalysisJob(job_id, 'xray', [uploaded_files[document_id]['file_path']])
+        job = AnalysisJob(job_id, 'xray', [file_path])
         analysis_jobs[job_id] = job
         
         # Start analysis in background thread
@@ -997,12 +1146,15 @@ def start_custom_analysis():
         if not custom_instructions:
             return jsonify({'error': 'Custom instructions are required'}), 400
         
-        # Validate all document IDs exist
+        # Validate all document IDs exist and get file paths
         file_paths = []
         for doc_id in document_ids:
             if doc_id not in uploaded_files:
                 return jsonify({'error': f'Document {doc_id} not found'}), 404
-            file_paths.append(uploaded_files[doc_id]['file_path'])
+            file_path = get_file_path_for_analysis(doc_id)
+            if not file_path:
+                return jsonify({'error': f'Failed to retrieve document {doc_id}'}), 500
+            file_paths.append(file_path)
         
         # Create analysis job with custom config
         job_id = str(uuid.uuid4())
