@@ -17,6 +17,18 @@ from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
 # Add parent directory to path for config import
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from config import AzureStorageConfig, APIConfig, AzureOpenAIConfig, AzureOpenAIXRayConfig, get_openai_client, get_xray_openai_client, get_blob_service_client
+from cosmos_storage import (
+    save_document_metadata,
+    get_document_metadata,
+    list_documents,
+    save_analysis_result,
+    get_analysis_result,
+    list_analysis_results,
+    job_to_dict,
+    upload_result_images,
+    upload_source_image,
+    get_result_image,
+)
 
 # Add the medical-analysis directory to the path to import existing analysis modules
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'medical-analysis'))
@@ -310,6 +322,14 @@ class AnalysisJob:
         self.custom_config = None  # For custom analyzer configuration
         self.metadata = {}  # For additional job metadata (e.g., document types)
 
+
+def _persist_job_to_cosmos(job):
+    """Helper: persist an AnalysisJob to Cosmos DB (non-blocking on failure)."""
+    try:
+        save_analysis_result(job.job_id, job_to_dict(job))
+    except Exception as e:
+        print(f"⚠️  Non-critical: failed to persist job {job.job_id} to Cosmos DB: {e}")
+
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'pdf', 'webp'}
@@ -487,7 +507,7 @@ def download_customer_document(customer_id, blob_path):
             download_file.write(blob_client.download_blob().readall())
         
         # Store file info
-        uploaded_files[file_id] = {
+        file_metadata = {
             'file_path': file_path,
             'filename': blob_path.split('/')[-1],
             'size': os.path.getsize(file_path),
@@ -495,6 +515,10 @@ def download_customer_document(customer_id, blob_path):
             'source': 'azure_blob',
             'customer_id': customer_id
         }
+        uploaded_files[file_id] = file_metadata
+        
+        # Persist document metadata to Cosmos DB
+        save_document_metadata(file_id, file_metadata)
         
         return jsonify({
             'documentId': file_id,
@@ -669,7 +693,7 @@ def download_sample_document(category, blob_path):
             download_file.write(blob_client.download_blob().readall())
         
         # Store file info
-        uploaded_files[file_id] = {
+        file_metadata = {
             'file_path': file_path,
             'filename': blob_path.split('/')[-1],
             'size': os.path.getsize(file_path),
@@ -677,6 +701,10 @@ def download_sample_document(category, blob_path):
             'source': 'azure_blob_sample',
             'category': category
         }
+        uploaded_files[file_id] = file_metadata
+        
+        # Persist document metadata to Cosmos DB
+        save_document_metadata(file_id, file_metadata)
         
         return jsonify({
             'documentId': file_id,
@@ -721,7 +749,7 @@ def upload_file():
             blob_client.upload_blob(file_content, overwrite=True)
             
             # Store file info (with blob reference instead of local path)
-            uploaded_files[file_id] = {
+            file_metadata = {
                 'id': file_id,
                 'original_name': file.filename,
                 'blob_name': blob_name,
@@ -731,6 +759,10 @@ def upload_file():
                 'content_type': file.content_type,
                 'storage_type': 'blob'
             }
+            uploaded_files[file_id] = file_metadata
+            
+            # Persist document metadata to Cosmos DB
+            save_document_metadata(file_id, file_metadata)
             
             return jsonify({
                 'documentId': file_id,
@@ -1196,6 +1228,22 @@ def get_analysis_status(job_id):
             # Cache in memory for future requests
             analysis_jobs[job_id] = job
     
+    # If not on disk either, try Cosmos DB
+    if not job:
+        cosmos_item = get_analysis_result(job_id)
+        if cosmos_item:
+            # Reconstruct AnalysisJob from Cosmos data and cache in memory
+            job = AnalysisJob(cosmos_item['jobId'], cosmos_item.get('job_type', 'unknown'), cosmos_item.get('file_paths', []))
+            job.status = cosmos_item.get('status', 'unknown')
+            job.progress = cosmos_item.get('progress', 0)
+            job.result = cosmos_item.get('result')
+            job.error = cosmos_item.get('error')
+            job.created_at = datetime.fromisoformat(cosmos_item['created_at']) if cosmos_item.get('created_at') else datetime.now()
+            job.completed_at = datetime.fromisoformat(cosmos_item['completed_at']) if cosmos_item.get('completed_at') else None
+            job.custom_config = cosmos_item.get('custom_config')
+            job.metadata = cosmos_item.get('metadata', {})
+            analysis_jobs[job_id] = job
+    
     if not job:
         return jsonify({'error': 'Job not found'}), 404
     
@@ -1380,11 +1428,13 @@ def run_comprehensive_analysis(job):
         job.progress = 100
         job.status = 'completed'
         job.completed_at = datetime.now()
+        _persist_job_to_cosmos(job)
         
     except Exception as e:
         print(f"Error in comprehensive analysis: {str(e)}")
         job.status = 'failed'
         job.error = str(e)
+        _persist_job_to_cosmos(job)
 
 def run_single_analysis(job):
     """Run single document analysis in background"""
@@ -1416,11 +1466,13 @@ def run_single_analysis(job):
         job.progress = 100
         job.status = 'completed'
         job.completed_at = datetime.now()
+        _persist_job_to_cosmos(job)
         
     except Exception as e:
         print(f"Error in single analysis: {str(e)}")
         job.status = 'failed'
         job.error = str(e)
+        _persist_job_to_cosmos(job)
 
 def run_fraud_analysis(job):
     """Run fraud detection analysis in background"""
@@ -1478,11 +1530,13 @@ def run_fraud_analysis(job):
         job.progress = 100
         job.status = 'completed'
         job.completed_at = datetime.now()
+        _persist_job_to_cosmos(job)
         
     except Exception as e:
         print(f"Error in fraud analysis: {str(e)}")
         job.status = 'failed'
         job.error = str(e)
+        _persist_job_to_cosmos(job)
 
 def run_batch_analysis(job):
     """Run batch analysis in background"""
@@ -1615,11 +1669,13 @@ def run_batch_analysis(job):
         job.progress = 100
         job.status = 'completed'
         job.completed_at = datetime.now()
+        _persist_job_to_cosmos(job)
         
     except Exception as e:
         print(f"Error in batch analysis: {str(e)}")
         job.status = 'failed'
         job.error = str(e)
+        _persist_job_to_cosmos(job)
 
 def run_mismatch_analysis(job):
     """Run mismatch analysis in background"""
@@ -1671,11 +1727,13 @@ def run_mismatch_analysis(job):
         job.progress = 100
         job.status = 'completed'
         job.completed_at = datetime.now()
+        _persist_job_to_cosmos(job)
         
     except Exception as e:
         print(f"Error in mismatch analysis: {str(e)}")
         job.status = 'failed'
         job.error = str(e)
+        _persist_job_to_cosmos(job)
 
 def run_fraud_detection_analysis(job):
     """Run fraud detection analysis - focuses on items billed but not in medical records"""
@@ -1743,11 +1801,13 @@ def run_fraud_detection_analysis(job):
         job.progress = 100
         job.status = 'completed'
         job.completed_at = datetime.now()
+        _persist_job_to_cosmos(job)
         
     except Exception as e:
         print(f"Error in fraud detection: {str(e)}")
         job.status = 'failed'
         job.error = str(e)
+        _persist_job_to_cosmos(job)
 
 def run_revenue_leakage_analysis(job):
     """Run revenue leakage analysis - focuses on items in records but not billed"""
@@ -1813,11 +1873,13 @@ def run_revenue_leakage_analysis(job):
         job.progress = 100
         job.status = 'completed'
         job.completed_at = datetime.now()
+        _persist_job_to_cosmos(job)
         
     except Exception as e:
         print(f"Error in revenue leakage analysis: {str(e)}")
         job.status = 'failed'
         job.error = str(e)
+        _persist_job_to_cosmos(job)
 
 def run_general_analysis(job):
     """Run general document analysis in background"""
@@ -1922,6 +1984,7 @@ Please provide a cohesive summary that synthesizes the information from all docu
         job.progress = 100
         job.status = 'completed'
         job.completed_at = datetime.now()
+        _persist_job_to_cosmos(job)
         
     except Exception as e:
         print(f"Error in general analysis: {str(e)}")
@@ -1929,6 +1992,7 @@ Please provide a cohesive summary that synthesizes the information from all docu
         print(f"Full traceback: {traceback.format_exc()}")
         job.status = 'failed'
         job.error = str(e)
+        _persist_job_to_cosmos(job)
 
 def run_xray_analysis(job):
     """Run X-ray analysis to generate radiology report"""
@@ -2016,6 +2080,7 @@ RECOMMENDATIONS:
         job.progress = 100
         job.status = 'completed'
         job.completed_at = datetime.now()
+        _persist_job_to_cosmos(job)
         
         print(f"✅ X-ray analysis completed successfully")
         
@@ -2025,6 +2090,7 @@ RECOMMENDATIONS:
         print(f"Full traceback: {traceback.format_exc()}")
         job.status = 'failed'
         job.error = str(e)
+        _persist_job_to_cosmos(job)
 
 def run_custom_analysis(job):
     """Run custom document analysis with user-defined instructions"""
@@ -2173,6 +2239,7 @@ Please provide a cohesive summary."""
         job.progress = 100
         job.status = 'completed'
         job.completed_at = datetime.now()
+        _persist_job_to_cosmos(job)
         
     except Exception as e:
         print(f"Error in custom analysis: {str(e)}")
@@ -2180,6 +2247,7 @@ Please provide a cohesive summary."""
         print(f"Full traceback: {traceback.format_exc()}")
         job.status = 'failed'
         job.error = str(e)
+        _persist_job_to_cosmos(job)
 
 def run_fake_document_detection(job):
     """Run fake document detection analysis in background"""
@@ -2235,6 +2303,7 @@ def run_fake_document_detection(job):
         job.progress = 100
         job.status = 'completed'
         job.completed_at = datetime.now()
+        _persist_job_to_cosmos(job)
         
     except Exception as e:
         print(f"Error in fake document detection: {str(e)}")
@@ -2242,6 +2311,7 @@ def run_fake_document_detection(job):
         print(f"Full traceback: {traceback.format_exc()}")
         job.status = 'failed'
         job.error = str(e)
+        _persist_job_to_cosmos(job)
 
 def run_tampering_detection(job):
     """Run tampering detection analysis in background"""
@@ -2287,16 +2357,30 @@ def run_tampering_detection(job):
             llm = page_result['llm_analysis']
             verdict = page_result['integrated_verdict']
             
+            # Upload forensic images to the parseai-results blob container
+            blob_images = {}
+            local_images = forensic.get('forensic_images', {})
+            if local_images:
+                print(f"  📤 Uploading forensic images for page {page_result['page']}...")
+                blob_images = upload_result_images(local_images, job.job_id)
+            
+            # Upload the source page image too
+            source_blob = upload_source_image(
+                page_result.get('image_path'), job.job_id, page_result['page']
+            )
+            
             formatted_results.append({
                 'page': page_result['page'],
                 'imagePath': page_result['image_path'],
+                'sourceBlobName': source_blob,
                 'forensicAnalysis': {
                     'score': forensic['forensic_score'],
                     'verdict': forensic['forensic_verdict'],
                     'reasons': forensic['forensic_reasons'],
                     'metrics': forensic['forensic_metrics'],
                     'outputDir': forensic['forensic_output_dir'],
-                    'images': forensic['forensic_images']
+                    'images': forensic['forensic_images'],
+                    'blobImages': blob_images
                 },
                 'llmAnalysis': llm,
                 'integratedVerdict': verdict
@@ -2319,6 +2403,7 @@ def run_tampering_detection(job):
         job.status = 'completed'
         job.completed_at = datetime.now()
         save_job_to_disk(job)  # Save final status
+        _persist_job_to_cosmos(job)
         
     except Exception as e:
         print(f"Error in tampering detection: {str(e)}")
@@ -2327,6 +2412,7 @@ def run_tampering_detection(job):
         job.status = 'failed'
         job.error = str(e)
         save_job_to_disk(job)  # Save error status
+        _persist_job_to_cosmos(job)
 
 @app.route('/analyze/fake-document', methods=['POST'])
 def start_fake_document_detection():
@@ -2468,6 +2554,7 @@ def run_co_document_analysis(job):
         job.progress = 100
         job.status = 'completed'
         job.completed_at = datetime.now()
+        _persist_job_to_cosmos(job)
         
     except Exception as e:
         print(f"Error in co-document analysis: {str(e)}")
@@ -2475,6 +2562,7 @@ def run_co_document_analysis(job):
         print(f"Full traceback: {traceback.format_exc()}")
         job.status = 'failed'
         job.error = str(e)
+        _persist_job_to_cosmos(job)
 
 @app.route('/analyze/co-document', methods=['POST'])
 def start_co_document_analysis():
@@ -2521,6 +2609,113 @@ def start_co_document_analysis():
         
     except Exception as e:
         return jsonify({'error': f'Failed to start co-document analysis: {str(e)}'}), 500
+
+
+# ============================================================
+#  Cosmos DB history / persistence endpoints
+# ============================================================
+
+@app.route('/history/documents', methods=['GET'])
+def list_stored_documents():
+    """List all document metadata stored in Cosmos DB"""
+    try:
+        partition = request.args.get('partition', 'uploads')
+        max_items = int(request.args.get('limit', 100))
+        docs = list_documents(partition_key=partition, max_items=max_items)
+        return jsonify({'documents': docs, 'count': len(docs)})
+    except Exception as e:
+        return jsonify({'error': f'Failed to list documents from Cosmos DB: {str(e)}'}), 500
+
+
+@app.route('/history/results', methods=['GET'])
+def list_stored_results():
+    """List all analysis results stored in Cosmos DB"""
+    try:
+        job_type = request.args.get('job_type')  # optional filter
+        max_items = int(request.args.get('limit', 100))
+        results = list_analysis_results(job_type=job_type, max_items=max_items)
+        return jsonify({'results': results, 'count': len(results)})
+    except Exception as e:
+        return jsonify({'error': f'Failed to list results from Cosmos DB: {str(e)}'}), 500
+
+
+@app.route('/history/results/<job_id>', methods=['GET'])
+def get_stored_result(job_id):
+    """Get a specific analysis result from Cosmos DB"""
+    try:
+        job_type = request.args.get('job_type')  # optional for faster lookup
+        item = get_analysis_result(job_id, job_type=job_type)
+        if not item:
+            return jsonify({'error': 'Result not found in Cosmos DB'}), 404
+        return jsonify(item)
+    except Exception as e:
+        return jsonify({'error': f'Failed to get result from Cosmos DB: {str(e)}'}), 500
+
+
+@app.route('/results/images/<job_id>/<image_name>', methods=['GET'])
+def serve_result_image(job_id, image_name):
+    """
+    Serve a forensic result image from the parseai-results blob container.
+    The blob path is:  results/<job_id>/<image_name>
+    
+    Usage examples:
+        GET /results/images/<job_id>/ela.png
+        GET /results/images/<job_id>/noise_analysis.png
+        GET /results/images/<job_id>/page_1_source.png
+    """
+    try:
+        from flask import Response
+        blob_name = f"results/{job_id}/{image_name}"
+        image_bytes = get_result_image(blob_name)
+        
+        if image_bytes is None:
+            return jsonify({'error': 'Image not found'}), 404
+        
+        # Determine content type from extension
+        ext = os.path.splitext(image_name)[1].lower()
+        content_types = {
+            '.png': 'image/png',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.bmp': 'image/bmp',
+            '.tiff': 'image/tiff',
+            '.webp': 'image/webp',
+            '.pdf': 'application/pdf',
+        }
+        mimetype = content_types.get(ext, 'application/octet-stream')
+        
+        return Response(image_bytes, mimetype=mimetype)
+    except Exception as e:
+        return jsonify({'error': f'Failed to serve result image: {str(e)}'}), 500
+
+
+@app.route('/results/images/<job_id>', methods=['GET'])
+def list_result_images(job_id):
+    """
+    List all result images for a job from the parseai-results blob container.
+    Returns blob names and API URLs for each image.
+    """
+    try:
+        blob_service = get_blob_service_client()
+        from config import AzureStorageConfig
+        container_client = blob_service.get_container_client(AzureStorageConfig.RESULTS_CONTAINER_NAME)
+        
+        prefix = f"results/{job_id}/"
+        blobs = container_client.list_blobs(name_starts_with=prefix)
+        
+        images = []
+        for blob in blobs:
+            filename = blob.name.split('/')[-1]
+            images.append({
+                'name': filename,
+                'blobName': blob.name,
+                'size': blob.size,
+                'url': f"/results/images/{job_id}/{filename}"
+            })
+        
+        return jsonify({'jobId': job_id, 'images': images, 'count': len(images)})
+    except Exception as e:
+        return jsonify({'error': f'Failed to list result images: {str(e)}'}), 500
 
 
 if __name__ == '__main__':

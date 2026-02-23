@@ -74,6 +74,7 @@ class AzureStorageConfig:
     """Azure Blob Storage Configuration - Uses Managed Identity"""
     ACCOUNT_URL = os.getenv('AZURE_STORAGE_ACCOUNT_URL')  # e.g., https://youraccount.blob.core.windows.net
     CONTAINER_NAME = os.getenv('AZURE_STORAGE_CONTAINER_NAME', 'apollo')
+    RESULTS_CONTAINER_NAME = os.getenv('AZURE_STORAGE_RESULTS_CONTAINER', 'parseai-results')
     
     @classmethod
     def validate(cls):
@@ -85,6 +86,26 @@ class AzureStorageConfig:
     @classmethod
     def get_credential(cls):
         """Get Azure credential for Blob Storage authentication"""
+        return get_azure_credential()
+
+
+class AzureCosmosConfig:
+    """Azure Cosmos DB Configuration - Uses Managed Identity"""
+    ENDPOINT = os.getenv('AZURE_COSMOS_ENDPOINT')  # e.g., https://youraccount.documents.azure.com:443/
+    DATABASE_NAME = os.getenv('AZURE_COSMOS_DATABASE', 'parseai')
+    DOCUMENTS_CONTAINER = os.getenv('AZURE_COSMOS_DOCUMENTS_CONTAINER', 'documents')
+    RESULTS_CONTAINER = os.getenv('AZURE_COSMOS_RESULTS_CONTAINER', 'analysis_results')
+    
+    @classmethod
+    def validate(cls):
+        """Validate that required configuration is present"""
+        if not cls.ENDPOINT:
+            raise ValueError("AZURE_COSMOS_ENDPOINT is not set in environment variables")
+        return True
+    
+    @classmethod
+    def get_credential(cls):
+        """Get Azure credential for Cosmos DB authentication"""
         return get_azure_credential()
 
 
@@ -134,6 +155,17 @@ def get_blob_service_client():
     )
 
 
+def get_cosmos_client():
+    """Get configured Azure Cosmos DB Client using Managed Identity"""
+    from azure.cosmos import CosmosClient
+    
+    AzureCosmosConfig.validate()
+    return CosmosClient(
+        url=AzureCosmosConfig.ENDPOINT,
+        credential=AzureCosmosConfig.get_credential()
+    )
+
+
 # Validate configuration on import (optional - can be disabled for testing)
 def validate_all():
     """Validate all required configuration is present"""
@@ -146,6 +178,11 @@ def validate_all():
     
     try:
         AzureStorageConfig.validate()
+    except ValueError as e:
+        errors.append(str(e))
+    
+    try:
+        AzureCosmosConfig.validate()
     except ValueError as e:
         errors.append(str(e))
     

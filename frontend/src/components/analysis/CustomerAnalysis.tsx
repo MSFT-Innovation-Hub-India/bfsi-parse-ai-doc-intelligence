@@ -269,10 +269,10 @@ const CustomerAnalysis = () => {
 
     try {
       let result;
-      const documentIds = selectedDocs.map(d => d.documentId!).filter(Boolean);
+      const documentIds = downloadedDocs.map(d => d.documentId!).filter(Boolean);
       
       // Store selected document IDs for later use in the viewer
-      setSelectedDocumentIds(selectedDocs.map(d => d.id).filter(Boolean));
+      setSelectedDocumentIds(downloadedDocs.map(d => d.id).filter(Boolean));
 
       if (module?.type === 'single') {
         result = await ApiService.startSingleDocumentAnalysis(documentIds[0]);

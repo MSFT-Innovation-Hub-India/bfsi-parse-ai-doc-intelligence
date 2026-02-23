@@ -12,6 +12,7 @@ gunicorn==21.2.0
 # Azure Services
 azure-storage-blob==12.19.0
 azure-identity==1.19.0
+azure-cosmos==4.7.0
 
 # OpenAI & AI
 openai==1.54.0

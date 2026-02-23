@@ -472,25 +472,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6 lg:col-span-2">
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="text-xl font-bold text-gray-900">Recent Activity</h3>
-            <button className="text-sm text-blue-600 hover:text-blue-700 font-semibold">View All</button>
-          </div>
-          <div className="text-center py-16">
-            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <DocumentTextIcon className="w-10 h-10 text-gray-400" />
-            </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-2">No Recent Activity</h3>
-            <p className="text-sm text-gray-600 mb-6 max-w-md mx-auto">Start analyzing documents to see your activity and history here</p>
-            <button
-              onClick={() => onNavigate('general')}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-md hover:shadow-lg"
-            >
-              Upload Document
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );
